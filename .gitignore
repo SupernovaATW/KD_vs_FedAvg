@@ -56,7 +56,7 @@ venv.bak/
 *.jpg
 *.jpeg
 *.json
-logs/
+logs/*.log
 runs/
 results/
 checkpoints/
