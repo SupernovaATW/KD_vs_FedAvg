@@ -52,11 +52,9 @@ venv.bak/
 .DS_Store
 
 # Experiment results
-*.png
 *.jpg
 *.jpeg
 *.json
-logs/*.log
 runs/
 results/
 checkpoints/
