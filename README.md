@@ -13,8 +13,10 @@ KD_vs_FedAvg/
 ├── data_loader.py         # CIFAR-10数据加载器
 ├── fedavg_training.py     # 联邦平均训练实现
 ├── kd_training.py         # 知识蒸馏训练实现
-├── main.py                # 主实验脚本
+├── main.py                # 主实验脚本（对比两种方法）
+├── tune_kd_params.py      # KD参数调优脚本
 ├── requirements.txt       # 依赖包列表
+├── logs/                  # 日志文件目录
 └── README.md              # 项目说明
 ```
 
@@ -43,6 +45,30 @@ python main.py --run_fedavg --epochs 100
 ```bash
 python main.py --run_kd --epochs 100
 ```
+
+### 5. **KD参数调优（推荐）**
+
+自动测试多组Temperature和Alpha参数，找出最佳配置：
+
+```bash
+# 默认测试 5个温度 × 4个alpha = 20组参数
+python tune_kd_params.py --epochs 100
+
+# 快速测试（10轮）
+python tune_kd_params.py --epochs 10
+
+# 自定义参数范围
+python tune_kd_params.py --custom_params \
+    --temperatures 3.0 4.0 5.0 \
+    --alphas 0.5 0.7 0.9 \
+    --epochs 50
+```
+
+**输出结果**：
+- CSV表格：`kd_tuning_results_YYYYMMDD_HHMMSS.csv`
+- JSON详情：`kd_tuning_results_YYYYMMDD_HHMMSS.json`
+- 热力图：`kd_tuning_heatmap_YYYYMMDD_HHMMSS.png`
+- 日志文件：`logs/kd_tuning_YYYYMMDD_HHMMSS.log`
 
 ## 📊 实验参数说明
 
