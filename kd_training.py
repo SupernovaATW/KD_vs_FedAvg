@@ -225,27 +225,31 @@ def train_student_with_kd(student_class, teacher_model, trainloader, testloader,
     return student_model, history, best_acc
 
 
-def train_kd_pipeline(model_class, trainloader, testloader, 
+def train_kd_pipeline(model_class, trainloader_teacher, trainloader_student, testloader, 
                      teacher_epochs=100, student_epochs=100,
                      lr=0.1, device='cuda', temperature=4.0, alpha=0.7):
     """
     完整的知识蒸馏流程：
-    1. 先训练教师模型
-    2. 再用教师模型指导学生模型训练
+    1. 先用教师数据集训练教师模型
+    2. 再用学生数据集和教师模型指导学生模型训练
+    
+    Args:
+        trainloader_teacher: 教师模型的训练数据（例如前50%数据）
+        trainloader_student: 学生模型的训练数据（例如后50%数据）
     """
     print("\n" + "="*60)
-    print("知识蒸馏训练流程")
+    print("知识蒸馏训练流程（公平对比：教师和学生使用不同的数据集）")
     print("="*60)
     
     # 阶段1: 训练教师模型
     teacher_model, teacher_history, teacher_best_acc = train_teacher(
-        model_class, trainloader, testloader, 
+        model_class, trainloader_teacher, testloader, 
         num_epochs=teacher_epochs, lr=lr, device=device
     )
     
     # 阶段2: 训练学生模型
     student_model, student_history, student_best_acc = train_student_with_kd(
-        model_class, teacher_model, trainloader, testloader,
+        model_class, teacher_model, trainloader_student, testloader,
         num_epochs=student_epochs, lr=lr, device=device,
         temperature=temperature, alpha=alpha
     )
@@ -266,13 +270,13 @@ def train_kd_pipeline(model_class, trainloader, testloader,
 
 if __name__ == '__main__':
     from models import ResNet18
-    from data_loader import get_cifar10_dataloaders
+    from data_loader import get_split_cifar10_dataloaders
     
     device = 'cuda' if torch.cuda.is_available() else 'cpu'
-    trainloader, testloader = get_cifar10_dataloaders(batch_size=128)
+    trainloader_teacher, trainloader_student, testloader = get_split_cifar10_dataloaders(batch_size=128)
     
     teacher_model, student_model, history, best_acc = train_kd_pipeline(
-        ResNet18, trainloader, testloader,
+        ResNet18, trainloader_teacher, trainloader_student, testloader,
         teacher_epochs=10, student_epochs=10,
         lr=0.1, device=device, temperature=4.0, alpha=0.7
     )

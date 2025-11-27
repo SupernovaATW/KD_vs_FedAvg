@@ -125,15 +125,17 @@ def main(args):
         print("实验2: 知识蒸馏 (先训练教师，再蒸馏到学生)")
         print("="*80)
         
-        # 加载完整数据集
-        trainloader, testloader = get_cifar10_dataloaders(
+        # 加载分割的数据集（公平对比：教师和学生各用一半数据）
+        trainloader_teacher, trainloader_student, testloader = get_split_cifar10_dataloaders(
             batch_size=args.batch_size,
-            num_workers=args.num_workers
+            num_workers=args.num_workers,
+            split_ratio=0.5
         )
         
         teacher_model, student_model, kd_history, kd_best_acc = train_kd_pipeline(
             ResNet18,
-            trainloader,
+            trainloader_teacher,
+            trainloader_student,
             testloader,
             teacher_epochs=args.epochs,
             student_epochs=args.epochs,
