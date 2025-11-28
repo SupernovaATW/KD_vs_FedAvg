@@ -1,214 +1,129 @@
-# CIFAR-10 + ResNet18: 联邦平均 vs 知识蒸馏对比实验
+## 项目概览
 
-本项目对比了在CIFAR-10数据集上使用ResNet18模型的两种训练策略：
-
-1. **联邦平均 (FedAvg)**: 同时训练两个模型，每轮训练后将参数平均
-2. **知识蒸馏 (Knowledge Distillation)**: 先训练一个教师模型，再用它指导学生模型训练
-
-## 📋 项目结构
+本仓库围绕 **CIFAR-10 + ResNet18** 构建了四个可独立运行的小项目，用于研究联邦平均 (FedAvg) 与知识蒸馏 (Knowledge Distillation) 在 IID/Non-IID 设置下的表现。
 
 ```
 KD_vs_FedAvg/
-├── models.py              # ResNet18模型定义
-├── data_loader.py         # CIFAR-10数据加载器
-├── fedavg_training.py     # 联邦平均训练实现
-├── kd_training.py         # 知识蒸馏训练实现
-├── main.py                # 主实验脚本（对比两种方法）
-├── tune_kd_params.py      # KD参数调优脚本
-├── requirements.txt       # 依赖包列表
-├── logs/                  # 日志文件目录
-└── README.md              # 项目说明
+├── common/                       # 共享模块（模型、数据、训练例程）
+│   ├── __init__.py
+│   ├── data_loader.py
+│   ├── fedavg_training.py
+│   ├── kd_training.py
+│   └── models.py
+├── 01_iid_comparison/
+│   ├── main.py                   # IID场景：FedAvg vs KD 对比
+│   └── iid_comparison_results/   # 结果留存目录
+├── 02_iid_kd_tune/
+│   ├── tune_kd_params.py         # IID场景的KD参数调优
+│   └── kd_iid_tuning_results/
+├── 03_non_iid_kd_tune/
+│   ├── tune_kd_params_noniid.py  # Non-IID场景的KD参数调优（支持多Dirichlet α）
+│   └── kd_non_iid_tuning_results/
+├── 04_non_iid_comparison/
+│   ├── compare_noniid.py         # Non-IID场景：FedAvg vs KD 对比（多Dirichlet α）
+│   └── comparison_outputs/
+├── data/                         # CIFAR-10（二进制格式，需提前下载/解压）
+├── logs/                         # 所有脚本默认写入的日志与可视化文件夹
+├── old_results/                  # 旧版结果归档
+├── requirements.txt
+└── README.md
 ```
 
-## 🚀 快速开始
+> ✅ 运行任意子项目前，请在仓库根目录执行命令（保证 `common/` 可以被 Python 找到）。
 
-### 1. 安装依赖
+## 环境准备
 
 ```bash
 pip install -r requirements.txt
 ```
 
-### 2. 运行完整对比实验
+## 共享模块简介 (`common/`)
 
-```bash
-python main.py --epochs 100 --batch_size 128 --lr 0.1
-```
+| 文件 | 功能 |
+| --- | --- |
+| `models.py` | ResNet18 定义（可扩展为其它网络） |
+| `data_loader.py` | CIFAR-10 加载、IID拆分、Dirichlet Non-IID划分（含表格化分布输出） |
+| `fedavg_training.py` | FedAvg 训练/评估流程 |
+| `kd_training.py` | 教师-学生蒸馏训练流水线 |
 
-### 3. 仅运行联邦平均
+所有子项目仅需从 `common` 导入，不再复制粘贴公共逻辑。
 
-```bash
-python main.py --run_fedavg --epochs 100
-```
+## 四个子项目
 
-### 4. 仅运行知识蒸馏
+### 01_iid_comparison
 
-```bash
-python main.py --run_kd --epochs 100
-```
+- **脚本**：`python 01_iid_comparison/main.py [args...]`
+- **用途**：在 IID 数据上直接对比 FedAvg 与 KD。
+- **常用参数**：
+   - `--epochs`、`--batch_size`、`--lr`
+   - `--device cuda|cpu`
+   - `--run_fedavg` / `--run_kd` 控制单独运行
+- **输出**：
+   - 训练日志 → `logs/experiment_*.log`
+   - JSON结果 → `01_iid_comparison/iid_comparison_results/`（可自定义）
+   - 可选的对比图（PNG）
 
-### 5. **KD参数调优（推荐）**
+### 02_iid_kd_tune
 
-自动测试多组Temperature和Alpha参数，找出最佳配置：
+- **脚本**：`python 02_iid_kd_tune/tune_kd_params.py [args...]`
+- **用途**：网格遍历 Temperature × Alpha，在 IID 下寻找最优 KD 组合。
+- **亮点**：
+   - 每次实验记录教师/学生表现与提升幅度
+   - 结果写入 `logs/kd_tuning_*.(csv|json)`
+- **示例**：
+   ```bash
+   python 02_iid_kd_tune/tune_kd_params.py \
+         --epochs 50 --temperatures 3 4 5 --alphas 0.5 0.7 0.9
+   ```
 
-```bash
-# 默认测试 5个温度 × 4个alpha = 20组参数
-python tune_kd_params.py --epochs 100
+### 03_non_iid_kd_tune
 
-# 快速测试（10轮）
-python tune_kd_params.py --epochs 10
+- **脚本**：`python 03_non_iid_kd_tune/tune_kd_params_noniid.py [args...]`
+- **用途**：在 Dirichlet Non-IID 拆分下调参。
+- **新增能力**：
+   - `--dirichlet_alphas 1.0 0.5 0.1`（默认）一次性跑多种异质程度
+   - 每个 α 的 Non-IID 数据分布会以表格形式写入 `logs/data_distribution_alpha*_*.txt`
+- **输出**：统一落在 `logs/`（CSV、JSON、日志）。
 
-# 自定义参数范围
-python tune_kd_params.py --custom_params \
-    --temperatures 3.0 4.0 5.0 \
-    --alphas 0.5 0.7 0.9 \
-    --epochs 50
-```
+### 04_non_iid_comparison
 
-**输出结果**：
-- CSV表格：`kd_tuning_results_YYYYMMDD_HHMMSS.csv`
-- JSON详情：`kd_tuning_results_YYYYMMDD_HHMMSS.json`
-- 热力图：`kd_tuning_heatmap_YYYYMMDD_HHMMSS.png`
-- 日志文件：`logs/kd_tuning_YYYYMMDD_HHMMSS.log`
+- **脚本**：`python 04_non_iid_comparison/compare_noniid.py [args...]`
+- **用途**：在多组 Dirichlet α × KD α 上，对比 FedAvg 与 KD 的性能差异。
+- **行为说明**：
+   - 外层遍历 `--dirichlet_alphas`（默认 `[1.0, 0.5, 0.1]`）
+   - 内层遍历 `--alphas`（默认 `[1.0, 0.5, 0.1]`）
+   - 每个 Dirichlet α 都会生成独立的对比柱状图与训练曲线，文件名自带标记，例如 `comparison_noniid_alpha0p5_*.png`
+   - 结果 CSV/JSON 会汇总所有组合，可在同一个文件里筛选。
+- **示例**：
+   ```bash
+   python 04_non_iid_comparison/compare_noniid.py \
+         --epochs 80 --temperature 4 --alphas 1.0 0.5 0.1 \
+         --dirichlet_alphas 1.0 0.5 0.1
+   ```
 
-## 📊 实验参数说明
+## 输出与日志
 
-### 基础参数
-- `--epochs`: 训练轮数（默认100）
-- `--batch_size`: 批次大小（默认128）
-- `--lr`: 初始学习率（默认0.1）
-- `--device`: 训练设备，cuda或cpu（默认cuda）
-- `--num_workers`: 数据加载线程数（默认2）
+- 统一日志目录：`logs/`
+   - `experiment_*.log` / `kd_tuning_*.log` / `compare_noniid_*.log`
+   - 数据分布表：`data_distribution_alpha*_*.txt`
+- 结果文件：
+   - CSV/JSON 会带时间戳方便追踪
+   - 图像 (PNG) 默认也存放在 `logs/`
 
-### 知识蒸馏参数
-- `--temperature`: 温度参数，用于软化输出分布（默认4.0）
-- `--alpha`: 蒸馏损失权重，0-1之间（默认0.7）
+> 所有脚本都配置了 `--log_dir` 参数，如需分项目保存可手动传入自定义路径。
 
-### 运行选项
-- `--run_fedavg`: 运行联邦平均实验
-- `--run_kd`: 运行知识蒸馏实验
-- `--no_plot`: 不生成对比图
-- `--save_results`: 保存实验结果到JSON
+## 运行提示
 
-### 输出路径
-- `--plot_path`: 对比图保存路径（默认comparison_plot.png）
-- `--results_path`: 结果JSON保存路径（默认experiment_results.json）
+- 建议使用 GPU (`--device cuda`)，否则需适度降低 `--epochs` 或 `--batch_size`。
+- 当 `Dirichlet α` 较小时（如 0.1），各客户端类别分布会非常不均衡；可通过生成的表格快速检查。
+- 若遇到显存不足，降低 `--batch_size` 或使用 `--epochs` 较小的快速实验模式。
 
-## 🔬 方法详解
+## 参考文献
 
-### 联邦平均 (FedAvg)
+1. He et al., *Deep Residual Learning for Image Recognition*, CVPR 2016
+2. McMahan et al., *Communication-Efficient Learning of Deep Networks from Decentralized Data*, AISTATS 2017
+3. Hinton et al., *Distilling the Knowledge in a Neural Network*, NIPS 2014 Workshop
 
-**流程**:
-1. 初始化两个相同的ResNet18模型
-2. 将训练数据分成两部分（模拟两个客户端）
-3. 每轮训练：
-   - 两个模型分别在各自数据上训练
-   - 训练完后将两个模型的参数平均
-   - 用平均后的参数更新两个模型
-4. 重复直到收敛
-
-**特点**:
-- 模拟联邦学习场景，数据不集中
-- 两个模型协同学习
-- 参数平均保证模型一致性
-
-### 知识蒸馏 (Knowledge Distillation)
-
-**流程**:
-1. 阶段1 - 训练教师模型：
-   - 在完整训练集上训练ResNet18
-   - 获得性能优秀的教师模型
-2. 阶段2 - 训练学生模型：
-   - 初始化新的ResNet18作为学生
-   - 使用蒸馏损失训练：
-     - 软标签损失（KL散度，来自教师）
-     - 硬标签损失（交叉熵，来自真实标签）
-   - 总损失 = α × 软标签损失 + (1-α) × 硬标签损失
-
-**特点**:
-- 教师模型传授"知识"给学生
-- 学生学习教师的输出分布，不仅是最终预测
-- 温度参数软化概率分布，让学生学到更多信息
-
-## 📈 实验输出
-
-### 训练过程输出
-- 每轮的训练/测试损失和准确率
-- 最佳模型自动保存：
-  - `best_fedavg_model.pth`: 联邦平均最佳模型
-  - `best_teacher_model.pth`: 教师模型
-  - `best_student_model.pth`: 学生模型
-
-### 对比可视化
-自动生成 `comparison_plot.png`，包含4个子图：
-1. 训练准确率对比
-2. 测试准确率对比
-3. 训练损失对比
-4. 测试损失对比
-
-### 结果JSON
-保存到 `experiment_results.json`，包含：
-- 实验配置参数
-- 两种方法的最佳准确率
-- 完整训练历史（损失、准确率）
-
-## 💡 使用示例
-
-### 快速测试（10轮）
-```bash
-python main.py --epochs 10 --batch_size 128
-```
-
-### 完整训练（100轮，使用GPU）
-```bash
-python main.py --epochs 100 --batch_size 128 --device cuda
-```
-
-### 调整知识蒸馏参数
-```bash
-python main.py --run_kd --temperature 3.0 --alpha 0.5 --epochs 100
-```
-
-### CPU训练（较慢）
-```bash
-python main.py --epochs 20 --device cpu --batch_size 64
-```
-
-## 🔍 预期结果
-
-在CIFAR-10上使用ResNet18，典型结果：
-- **联邦平均**: 测试准确率约 90-93%
-- **知识蒸馏**: 测试准确率约 91-94%
-
-具体结果取决于：
-- 训练轮数
-- 学习率调度
-- 数据增强
-- 知识蒸馏的温度和alpha参数
-
-## 📚 参考文献
-
-1. **ResNet**: He et al., "Deep Residual Learning for Image Recognition", CVPR 2016
-2. **FedAvg**: McMahan et al., "Communication-Efficient Learning of Deep Networks from Decentralized Data", AISTATS 2017
-3. **Knowledge Distillation**: Hinton et al., "Distilling the Knowledge in a Neural Network", NIPS 2014 Workshop
-
-## ⚙️ 系统要求
-
-- Python 3.7+
-- PyTorch 2.0+
-- CUDA（可选，用于GPU加速）
-- 至少8GB RAM（CPU训练）或4GB VRAM（GPU训练）
-
-## 🐛 常见问题
-
-**Q: CUDA out of memory错误？**
-A: 减小batch_size，例如 `--batch_size 64`
-
-**Q: 训练很慢？**
-A: 确保使用GPU (`--device cuda`)，增加num_workers (`--num_workers 4`)
-
-**Q: 如何只运行其中一种方法？**
-A: 使用 `--run_fedavg` 或 `--run_kd` 单独指定
-
-## 📝 License
+## License
 
 MIT License

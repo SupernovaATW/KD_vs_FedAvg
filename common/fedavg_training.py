@@ -130,11 +130,10 @@ def train_fedavg(model_class, trainloader1, trainloader2, testloader,
         history['test_loss'].append(test_loss)
         history['test_acc'].append(test_acc)
         
-        # 保存最佳模型
+        # 更新最佳准确率
         if test_acc > best_acc:
             best_acc = test_acc
-            torch.save(averaged_model.state_dict(), 'best_fedavg_model.pth')
-            print(f"✓ 保存最佳模型 (Acc: {best_acc:.2f}%)")
+            print(f"✓ 新的最佳准确率: {best_acc:.2f}%")
     
     print(f"\n联邦平均训练完成! 最佳测试准确率: {best_acc:.2f}%")
     
@@ -142,8 +141,8 @@ def train_fedavg(model_class, trainloader1, trainloader2, testloader,
 
 
 if __name__ == '__main__':
-    from models import ResNet18
-    from data_loader import get_split_cifar10_dataloaders
+    from .models import ResNet18
+    from .data_loader import get_split_cifar10_dataloaders
     
     device = 'cuda' if torch.cuda.is_available() else 'cpu'
     trainloader1, trainloader2, testloader = get_split_cifar10_dataloaders(batch_size=128)

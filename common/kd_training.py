@@ -158,11 +158,10 @@ def train_teacher(model_class, trainloader, testloader, num_epochs=100,
         history['test_loss'].append(test_loss)
         history['test_acc'].append(test_acc)
         
-        # 保存最佳模型
+        # 更新最佳准确率
         if test_acc > best_acc:
             best_acc = test_acc
-            torch.save(model.state_dict(), 'best_teacher_model.pth')
-            print(f"✓ 保存最佳教师模型 (Acc: {best_acc:.2f}%)")
+            print(f"✓ 新的最佳准确率: {best_acc:.2f}%")
     
     print(f"\n教师模型训练完成! 最佳测试准确率: {best_acc:.2f}%")
     
@@ -214,11 +213,10 @@ def train_student_with_kd(student_class, teacher_model, trainloader, testloader,
         history['test_loss'].append(test_loss)
         history['test_acc'].append(test_acc)
         
-        # 保存最佳模型
+        # 更新最佳准确率
         if test_acc > best_acc:
             best_acc = test_acc
-            torch.save(student_model.state_dict(), 'best_student_model.pth')
-            print(f"✓ 保存最佳学生模型 (Acc: {best_acc:.2f}%)")
+            print(f"✓ 新的最佳准确率: {best_acc:.2f}%")
     
     print(f"\n学生模型训练完成! 最佳测试准确率: {best_acc:.2f}%")
     
@@ -269,8 +267,8 @@ def train_kd_pipeline(model_class, trainloader_teacher, trainloader_student, tes
 
 
 if __name__ == '__main__':
-    from models import ResNet18
-    from data_loader import get_split_cifar10_dataloaders
+    from .models import ResNet18
+    from .data_loader import get_split_cifar10_dataloaders
     
     device = 'cuda' if torch.cuda.is_available() else 'cpu'
     trainloader_teacher, trainloader_student, testloader = get_split_cifar10_dataloaders(batch_size=128)

@@ -6,10 +6,10 @@ from datetime import datetime
 import logging
 import os
 
-from models import ResNet18
-from data_loader import get_cifar10_dataloaders, get_split_cifar10_dataloaders
-from fedavg_training import train_fedavg
-from kd_training import train_kd_pipeline
+from common.models import ResNet18
+from common.data_loader import get_cifar10_dataloaders, get_split_cifar10_dataloaders
+from common.fedavg_training import train_fedavg
+from common.kd_training import train_kd_pipeline
 
 
 def plot_comparison(fedavg_history, kd_history, save_path='comparison_plot.png'):

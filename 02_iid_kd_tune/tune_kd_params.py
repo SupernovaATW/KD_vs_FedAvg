@@ -7,9 +7,9 @@ import logging
 import os
 from itertools import product
 
-from models import ResNet18
-from data_loader import get_split_cifar10_dataloaders
-from kd_training import train_kd_pipeline
+from common.models import ResNet18
+from common.data_loader import get_split_cifar10_dataloaders
+from common.kd_training import train_kd_pipeline
 
 
 def setup_logging(log_dir='logs'):
