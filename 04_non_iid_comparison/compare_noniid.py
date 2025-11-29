@@ -5,9 +5,13 @@ import matplotlib.pyplot as plt
 from datetime import datetime
 import logging
 import os
+import sys
 import pandas as pd
 import numpy as np
 from typing import Any, Optional, Tuple, cast
+
+# 添加项目根目录到Python路径
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from common.models import ResNet18
 from common.data_loader import get_noniid_cifar10_dataloaders
@@ -15,7 +19,7 @@ from common.fedavg_training import train_fedavg
 from common.kd_training import train_kd_pipeline
 
 
-def setup_logging(log_dir='logs'):
+def setup_logging(log_dir='comparison_outputs'):
     """设置日志系统"""
     os.makedirs(log_dir, exist_ok=True)
     timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
@@ -34,13 +38,13 @@ def setup_logging(log_dir='logs'):
     return log_file
 
 
-def plot_comparison(results, save_dir='results', dirichlet_alpha=None):
+def plot_comparison(results, save_dir='comparison_outputs', dirichlet_alpha=None):
     """绘制对比图"""
     os.makedirs(save_dir, exist_ok=True)
     timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
     
     # 提取数据
-    alphas = [r['alpha'] for r in results]
+    dirichlet_alphas = [r['dirichlet_alpha'] for r in results]
     fedavg_accs = [r['fedavg_best_acc'] for r in results]
     kd_accs = [r['kd_best_acc'] for r in results]
     improvements = [r['improvement'] for r in results]
@@ -49,17 +53,16 @@ def plot_comparison(results, save_dir='results', dirichlet_alpha=None):
     fig, axes = plt.subplots(1, 2, figsize=(15, 5))
     
     # 准确率对比
-    x = range(len(alphas))
+    x = range(len(dirichlet_alphas))
     width = 0.35
     
     axes[0].bar([i - width/2 for i in x], fedavg_accs, width, label='FedAvg', alpha=0.8)
-    axes[0].bar([i + width/2 for i in x], kd_accs, width, label='KD', alpha=0.8)
-    axes[0].set_xlabel('KD Alpha Value', fontsize=12)
+    axes[0].bar([i + width/2 for i in x], kd_accs, width, label='KD (Best Params)', alpha=0.8)
+    axes[0].set_xlabel('Dirichlet Alpha (Non-IID Level)', fontsize=12)
     axes[0].set_ylabel('Test Accuracy (%)', fontsize=12)
-    title_suffix = f" (Dirichlet α={dirichlet_alpha})" if dirichlet_alpha is not None else ""
-    axes[0].set_title(f'FedAvg vs KD Performance{title_suffix}', fontsize=14)
+    axes[0].set_title('FedAvg vs KD Performance Across Non-IID Levels', fontsize=14)
     axes[0].set_xticks(x)
-    axes[0].set_xticklabels([f'α={a}' for a in alphas])
+    axes[0].set_xticklabels([f'α={a}' for a in dirichlet_alphas])
     axes[0].legend()
     axes[0].grid(True, alpha=0.3)
     
@@ -67,16 +70,15 @@ def plot_comparison(results, save_dir='results', dirichlet_alpha=None):
     colors = ['green' if imp > 0 else 'red' for imp in improvements]
     axes[1].bar(x, improvements, color=colors, alpha=0.8)
     axes[1].axhline(y=0, color='black', linestyle='--', linewidth=1)
-    axes[1].set_xlabel('KD Alpha Value', fontsize=12)
+    axes[1].set_xlabel('Dirichlet Alpha (Non-IID Level)', fontsize=12)
     axes[1].set_ylabel('Improvement (%)', fontsize=12)
-    axes[1].set_title(f'KD Improvement over FedAvg{title_suffix}', fontsize=14)
+    axes[1].set_title('KD Improvement over FedAvg', fontsize=14)
     axes[1].set_xticks(x)
-    axes[1].set_xticklabels([f'α={a}' for a in alphas])
+    axes[1].set_xticklabels([f'α={a}' for a in dirichlet_alphas])
     axes[1].grid(True, alpha=0.3)
     
     plt.tight_layout()
-    alpha_tag = f"_alpha{str(dirichlet_alpha).replace('.', 'p')}" if dirichlet_alpha is not None else ""
-    plot_file = os.path.join(save_dir, f'comparison_noniid{alpha_tag}_{timestamp}.png')
+    plot_file = os.path.join(save_dir, f'comparison_noniid_best_params_{timestamp}.png')
     plt.savefig(plot_file, dpi=300, bbox_inches='tight')
     print(f"\n对比图已保存到: {plot_file}")
     plt.close()
@@ -84,7 +86,7 @@ def plot_comparison(results, save_dir='results', dirichlet_alpha=None):
     return plot_file
 
 
-def plot_training_curves(results, save_dir='results', dirichlet_alpha=None):
+def plot_training_curves(results, save_dir='comparison_outputs', dirichlet_alpha=None):
     """绘制训练曲线"""
     os.makedirs(save_dir, exist_ok=True)
     timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
@@ -95,9 +97,8 @@ def plot_training_curves(results, save_dir='results', dirichlet_alpha=None):
     if n_experiments == 1:
         axes = axes.reshape(1, -1)
     
-    title_suffix = f" | Dirichlet α={dirichlet_alpha}" if dirichlet_alpha is not None else ""
     for idx, result in enumerate(results):
-        alpha = result['alpha']
+        dir_alpha = result['dirichlet_alpha']
         fedavg_history = result['fedavg_history']
         kd_history = result['kd_history']
         
@@ -106,7 +107,7 @@ def plot_training_curves(results, save_dir='results', dirichlet_alpha=None):
         axes[idx, 0].plot(kd_history['student']['train_acc'], label='KD', marker='s', markersize=3)
         axes[idx, 0].set_xlabel('Epoch')
         axes[idx, 0].set_ylabel('Accuracy (%)')
-        axes[idx, 0].set_title(f'Training Accuracy (α={alpha}){title_suffix}')
+        axes[idx, 0].set_title(f'Training Accuracy (Dirichlet α={dir_alpha})')
         axes[idx, 0].legend()
         axes[idx, 0].grid(True, alpha=0.3)
         
@@ -115,13 +116,12 @@ def plot_training_curves(results, save_dir='results', dirichlet_alpha=None):
         axes[idx, 1].plot(kd_history['student']['test_acc'], label='KD', marker='s', markersize=3)
         axes[idx, 1].set_xlabel('Epoch')
         axes[idx, 1].set_ylabel('Accuracy (%)')
-        axes[idx, 1].set_title(f'Test Accuracy (α={alpha}){title_suffix}')
+        axes[idx, 1].set_title(f'Test Accuracy (Dirichlet α={dir_alpha})')
         axes[idx, 1].legend()
         axes[idx, 1].grid(True, alpha=0.3)
     
     plt.tight_layout()
-    alpha_tag = f"_alpha{str(dirichlet_alpha).replace('.', 'p')}" if dirichlet_alpha is not None else ""
-    plot_file = os.path.join(save_dir, f'training_curves_noniid{alpha_tag}_{timestamp}.png')
+    plot_file = os.path.join(save_dir, f'training_curves_noniid_best_params_{timestamp}.png')
     plt.savefig(plot_file, dpi=300, bbox_inches='tight')
     print(f"训练曲线已保存到: {plot_file}")
     plt.close()
@@ -132,11 +132,11 @@ def plot_training_curves(results, save_dir='results', dirichlet_alpha=None):
 def run_single_comparison(alpha, temperature, epochs, batch_size, lr, device, dirichlet_alpha, num_workers=2, seed=7000, visualize_data=False):
     """运行单次对比实验"""
     print(f"\n{'='*80}")
-    print(f"对比实验: KD Alpha={alpha}, Temperature={temperature}, Dirichlet={dirichlet_alpha}")
+    print(f"对比实验: Dirichlet Alpha={dirichlet_alpha}, KD Alpha={alpha}, Temperature={temperature}")
     print(f"{'='*80}")
     
     logging.info(f"\n{'='*80}")
-    logging.info(f"对比实验: KD Alpha={alpha}, Temperature={temperature}, Dirichlet={dirichlet_alpha}")
+    logging.info(f"对比实验: Dirichlet Alpha={dirichlet_alpha}, KD Alpha={alpha}, Temperature={temperature}")
     logging.info(f"{'='*80}")
     
     # 加载Non-IID数据
@@ -150,7 +150,7 @@ def run_single_comparison(alpha, temperature, epochs, batch_size, lr, device, di
             num_clients=2,
             seed=seed,
             visualize=visualize_data,
-            save_dir='logs',
+            save_dir='comparison_outputs',
             return_distribution=True
         )
     )
@@ -246,73 +246,97 @@ def main(args):
     
     log_file = setup_logging(args.log_dir)
     
+    # 根据03实验结果，定义每个dirichlet_alpha下的最佳KD参数
+    best_kd_params = {
+        1.0: {'temperature': 2.0, 'alpha': 0.3},  # improvement=11.30%, student_best_acc=92.1%
+        0.5: {'temperature': 6.0, 'alpha': 0.3},  # improvement=3.46%, student_best_acc=90.82%
+        0.1: {'temperature': 5.0, 'alpha': 0.3}   # improvement=24.35%, student_best_acc=85.09%
+    }
+    
     print("\n" + "="*80)
-    print("FedAvg vs KD 对比实验 (Non-IID)")
+    print("FedAvg vs KD 对比实验 (Non-IID) - 使用最佳参数")
     print("="*80)
     print(f"开始时间: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
     print(f"设备: {args.device}")
     print(f"Epoch数: {args.epochs}")
     print(f"批次大小: {args.batch_size}")
     print(f"学习率: {args.lr}")
-    print(f"Temperature: {args.temperature}")
     print(f"Dirichlet Alpha列表: {args.dirichlet_alphas}")
     print(f"随机种子: {args.seed}")
-    print(f"测试的Alpha值: {args.alphas}")
+    print("\n每个Dirichlet Alpha的最佳KD参数 (来自03实验):")
+    for dir_alpha, params in best_kd_params.items():
+        if dir_alpha in args.dirichlet_alphas:
+            print(f"  Dirichlet α={dir_alpha}: Temperature={params['temperature']}, KD α={params['alpha']}")
     print(f"日志文件: {log_file}")
     print("="*80)
     
     logging.info("="*80)
-    logging.info("FedAvg vs KD 对比实验 (Non-IID)")
+    logging.info("FedAvg vs KD 对比实验 (Non-IID) - 使用最佳参数")
     logging.info("="*80)
     logging.info(f"基础配置:")
     logging.info(f"  设备: {args.device}")
     logging.info(f"  Epoch数: {args.epochs}")
     logging.info(f"  批次大小: {args.batch_size}")
     logging.info(f"  学习率: {args.lr}")
-    logging.info(f"  Temperature: {args.temperature}")
     logging.info(f"  Dirichlet Alpha列表: {args.dirichlet_alphas}")
     logging.info(f"  随机种子: {args.seed}")
-    logging.info(f"  测试的Alpha值: {args.alphas}")
+    logging.info("\n每个Dirichlet Alpha的最佳KD参数:")
+    for dir_alpha, params in best_kd_params.items():
+        if dir_alpha in args.dirichlet_alphas:
+            logging.info(f"  Dirichlet α={dir_alpha}: Temperature={params['temperature']}, KD α={params['alpha']}")
     
     # 运行所有对比实验
     all_results = []
     plot_files = []
     curves_files = []
-    total_runs = len(args.dirichlet_alphas) * len(args.alphas)
+    total_runs = len(args.dirichlet_alphas)
     current_run = 0
     visualized = False
     
     for dir_alpha in args.dirichlet_alphas:
-        dir_results = []
-        for alpha in args.alphas:
-            current_run += 1
-            print(f"\n{'-'*80}")
-            print(f"Dirichlet Alpha: {dir_alpha} | KD Alpha: {alpha} ({current_run}/{total_runs})")
-            print(f"{'-'*80}")
-            
-            visualize_data = not visualized
-            result = run_single_comparison(
-                alpha=alpha,
-                temperature=args.temperature,
-                epochs=args.epochs,
-                batch_size=args.batch_size,
-                lr=args.lr,
-                device=args.device,
-                dirichlet_alpha=dir_alpha,
-                num_workers=args.num_workers,
-                seed=args.seed,
-                visualize_data=visualize_data
-            )
-            
-            if visualize_data:
-                visualized = True
-            
-            dir_results.append(result)
-            all_results.append(result)
+        current_run += 1
         
-        # 针对当前Dirichlet alpha绘制图表
-        plot_files.append(plot_comparison(dir_results, save_dir=args.log_dir, dirichlet_alpha=dir_alpha))
-        curves_files.append(plot_training_curves(dir_results, save_dir=args.log_dir, dirichlet_alpha=dir_alpha))
+        # 获取该dirichlet_alpha下的最佳KD参数
+        if dir_alpha not in best_kd_params:
+            print(f"\n警告: Dirichlet Alpha={dir_alpha} 没有预设的最佳参数，跳过")
+            logging.warning(f"Dirichlet Alpha={dir_alpha} 没有预设的最佳参数，跳过")
+            continue
+        
+        kd_params = best_kd_params[dir_alpha]
+        temperature = kd_params['temperature']
+        alpha = kd_params['alpha']
+        
+        print(f"\n{'-'*80}")
+        print(f"Dirichlet Alpha: {dir_alpha} | 使用最佳参数: Temperature={temperature}, KD α={alpha} ({current_run}/{total_runs})")
+        print(f"{'-'*80}")
+        
+        visualize_data = not visualized
+        result = run_single_comparison(
+            alpha=alpha,
+            temperature=temperature,
+            epochs=args.epochs,
+            batch_size=args.batch_size,
+            lr=args.lr,
+            device=args.device,
+            dirichlet_alpha=dir_alpha,
+            num_workers=args.num_workers,
+            seed=args.seed,
+            visualize_data=visualize_data
+        )
+        
+        if visualize_data:
+            visualized = True
+        
+        all_results.append(result)
+    
+    if not all_results:
+        print("没有生成任何结果")
+        logging.error("没有生成任何结果")
+        return
+    
+    # 针对所有结果绘制对比图
+    plot_files.append(plot_comparison(all_results, save_dir=args.log_dir, dirichlet_alpha=None))
+    curves_files.append(plot_training_curves(all_results, save_dir=args.log_dir, dirichlet_alpha=None))
     
     # 保存结果
     timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
@@ -343,7 +367,6 @@ def main(args):
     csv_file = os.path.join(args.log_dir, f'comparison_noniid_summary_{timestamp}.csv')
     df.to_csv(csv_file, index=False, encoding='utf-8')
     
-    # 绘制对比图
     # 输出总结
     print("\n" + "="*80)
     print("实验完成！")
@@ -371,6 +394,7 @@ def main(args):
         print("最佳配置:")
         print(f"  Dirichlet Alpha: {best_result['dirichlet_alpha']}")
         print(f"  KD Alpha: {best_result['alpha']}")
+        print(f"  Temperature: {best_result['temperature']}")
         print(f"  FedAvg最佳准确率: {best_result['fedavg_best_acc']:.2f}%")
         print(f"  KD最佳准确率: {best_result['kd_best_acc']:.2f}%")
         print(f"  提升: {best_result['improvement']:+.2f}%")
@@ -379,6 +403,7 @@ def main(args):
         logging.info("\n实验完成")
         logging.info(f"最佳Dirichlet Alpha: {best_result['dirichlet_alpha']}")
         logging.info(f"最佳KD Alpha: {best_result['alpha']}")
+        logging.info(f"最佳Temperature: {best_result['temperature']}")
         logging.info(f"KD最佳准确率: {best_result['kd_best_acc']:.2f}%")
         logging.info(f"提升: {best_result['improvement']:+.2f}%")
     else:
@@ -396,18 +421,12 @@ if __name__ == '__main__':
     parser.add_argument('--device', type=str, default='cuda' if torch.cuda.is_available() else 'cpu',
                         help='训练设备')
     parser.add_argument('--num_workers', type=int, default=2, help='数据加载器工作进程数')
-    parser.add_argument('--log_dir', type=str, default='logs', help='日志目录')
+    parser.add_argument('--log_dir', type=str, default='comparison_outputs', help='日志目录')
     parser.add_argument('--seed', type=int, default=7000, help='随机种子')
     
     # Non-IID参数
     parser.add_argument('--dirichlet_alphas', type=float, nargs='+', default=[1.0, 0.5, 0.1],
-                        help='Dirichlet分布的alpha参数列表，越小越Non-IID')
-    
-    # KD参数
-    parser.add_argument('--temperature', type=float, default=4.0,
-                        help='知识蒸馏温度参数')
-    parser.add_argument('--alphas', type=float, nargs='+', default=[1.0, 0.5, 0.1],
-                        help='要测试的Alpha值列表')
+                        help='Dirichlet分布的alpha参数列表，越小越Non-IID (默认使用03实验的最佳参数配置)')
     
     args = parser.parse_args()
     
