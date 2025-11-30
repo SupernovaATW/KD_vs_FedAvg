@@ -1,0 +1,4 @@
+alpha,temperature,dirichlet_alpha,fedavg_best_acc,fedavg_final_acc,kd_best_acc,kd_final_acc,teacher_final_acc,improvement
+0.3,2.0,1.0,93.64,92.62,91.92,91.77,79.9,-1.7199999999999989
+0.3,6.0,0.5,93.8,93.74,91.2,91.07,87.98,-2.5999999999999943
+0.3,5.0,0.1,78.75,77.37,84.95,83.85,62.26,6.200000000000003
