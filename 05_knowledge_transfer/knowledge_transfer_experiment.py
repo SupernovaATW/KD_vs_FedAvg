@@ -743,22 +743,21 @@ def run_knowledge_transfer_experiment(num_large_nodes=4, large_to_small_ratio=10
             print(f"  ✓ 新的最佳准确率: {best_acc:.2f}%")
         print(f"{'─'*80}")
         
-        # 每5轮或最后一轮保存中间结果
-        if (round + 1) % 5 == 0 or round == num_rounds - 1:
-            intermediate_file = results_dir / f"intermediate_round_{round+1}.json"
-            with open(intermediate_file, 'w', encoding='utf-8') as f:
-                json.dump({
-                    'completed_rounds': round + 1,
-                    'total_rounds': num_rounds,
-                    'best_acc': best_acc,
-                    'round_details': history['round_details'],
-                    'last_round': {
-                        'fedavg_acc': fedavg_test_acc,
-                        'kd_acc': kd_test_acc,
-                        'final_acc': final_test_acc
-                    }
-                }, f, indent=2, ensure_ascii=False)
-            print(f"\n💾 已保存中间结果到: {intermediate_file.name}")
+        # 每轮结束都保存中间结果
+        intermediate_file = results_dir / f"intermediate_round_{round+1}.json"
+        with open(intermediate_file, 'w', encoding='utf-8') as f:
+            json.dump({
+                'completed_rounds': round + 1,
+                'total_rounds': num_rounds,
+                'best_acc': best_acc,
+                'round_details': history['round_details'],
+                'last_round': {
+                    'fedavg_acc': fedavg_test_acc,
+                    'kd_acc': kd_test_acc,
+                    'final_acc': final_test_acc
+                }
+            }, f, indent=2, ensure_ascii=False)
+        print(f"\n💾 已保存中间结果到: {intermediate_file.name}")
     
     final_model = student_model
     
