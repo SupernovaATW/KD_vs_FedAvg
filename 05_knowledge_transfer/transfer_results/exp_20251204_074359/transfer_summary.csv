@@ -1,0 +1,18 @@
+Metric,Value
+Cyclic KD Training - Best Acc,79.51%
+Baseline FedAvg - Best Acc,95.66%
+Improvement,+-16.15%
+""
+Configuration,
+num_large_nodes,4
+large_to_small_ratio,10
+num_rounds,100
+local_epochs,20
+kd_epochs,20
+total_fedavg_epochs,2000
+total_kd_epochs,2000
+lr,0.1
+temperature,4.0
+alpha,0.7
+batch_size,128
+seed,42
