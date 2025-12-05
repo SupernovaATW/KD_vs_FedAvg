@@ -1,0 +1,2 @@
+temperature,alpha,baseline_acc,final_teacher_acc,final_student_acc,best_student_acc,best_teacher_acc,total_improvement_over_baseline
+1,0.1,34.65,43.9,27.13,40.6,61.62,-7.52
