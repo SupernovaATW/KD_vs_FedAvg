@@ -61,14 +61,38 @@ class ResNet(nn.Module):
         return out
 
 
+def ResNet8(num_classes=10):
+    """ResNet8 - 小模型"""
+    return ResNet(BasicBlock, [1, 1, 1, 1], num_classes=num_classes)
+
+
 def ResNet18(num_classes=10):
+    """ResNet18 - 标准模型"""
     return ResNet(BasicBlock, [2, 2, 2, 2], num_classes=num_classes)
+
+
+def ResNet34(num_classes=10):
+    """ResNet34 - 大模型"""
+    return ResNet(BasicBlock, [3, 4, 6, 3], num_classes=num_classes)
 
 
 if __name__ == '__main__':
     # 测试模型
-    net = ResNet18()
+    print("Testing ResNet8:")
+    net8 = ResNet8()
     x = torch.randn(2, 3, 32, 32)
-    y = net(x)
-    print(f"Output shape: {y.shape}")
-    print(f"Total parameters: {sum(p.numel() for p in net.parameters())}")
+    y8 = net8(x)
+    print(f"Output shape: {y8.shape}")
+    print(f"Total parameters: {sum(p.numel() for p in net8.parameters())}")
+    
+    print("\nTesting ResNet18:")
+    net18 = ResNet18()
+    y18 = net18(x)
+    print(f"Output shape: {y18.shape}")
+    print(f"Total parameters: {sum(p.numel() for p in net18.parameters())}")
+    
+    print("\nTesting ResNet34:")
+    net34 = ResNet34()
+    y34 = net34(x)
+    print(f"Output shape: {y34.shape}")
+    print(f"Total parameters: {sum(p.numel() for p in net34.parameters())}")

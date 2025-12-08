@@ -138,3 +138,36 @@ def load_cifar10_data(data_root='./data', batch_size=128, num_workers=2):
     print(f"测试集大小: {len(testset)}")
     
     return trainset, testset, testloader
+
+
+def split_dataset_by_ratio(num_large_nodes=4, large_to_small_ratio=10,
+                          batch_size=128, num_workers=2, data_root='./data'):
+    """
+    一站式函数：加载数据集并分配给各个节点
+    
+    Args:
+        num_large_nodes: 大数据节点数量
+        large_to_small_ratio: 大小节点数据量比例
+        batch_size: 批次大小
+        num_workers: 工作线程数
+        data_root: 数据根目录
+    
+    Returns:
+        large_trainloaders: 大数据节点的数据加载器列表
+        small_trainloader: 小数据节点的数据加载器
+        testloader: 测试数据加载器
+    """
+    # 加载数据集
+    trainset, testset, testloader = load_cifar10_data(data_root, batch_size, num_workers)
+    
+    # 分配数据
+    large_nodes_indices, small_node_indices = split_dataset_for_nodes(
+        trainset, num_large_nodes, large_to_small_ratio
+    )
+    
+    # 创建数据加载器
+    large_trainloaders, small_trainloader = create_dataloaders(
+        trainset, large_nodes_indices, small_node_indices, batch_size, num_workers
+    )
+    
+    return large_trainloaders, small_trainloader, testloader

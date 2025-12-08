@@ -100,6 +100,85 @@ def train_epoch_kd(student_model, teacher_model, trainloader, optimizer, device,
     return avg_loss, avg_kd_loss, avg_ce_loss, accuracy
 
 
+def train_epoch_multi_teacher_kd(student_model, teacher_models, trainloader, optimizer, device,
+                                 temperature=4.0, alpha=0.7):
+    """
+    使用多个教师模型的平均logits进行知识蒸馏训练学生模型一个epoch
+    
+    Args:
+        student_model: 学生模型
+        teacher_models: 教师模型列表（已训练好）
+        trainloader: 训练数据加载器
+        optimizer: 优化器
+        device: 设备
+        temperature: 温度参数
+        alpha: 蒸馏损失的权重
+    
+    Returns:
+        avg_loss: 平均总损失
+        avg_kd_loss: 平均蒸馏损失
+        avg_ce_loss: 平均交叉熵损失
+        accuracy: 准确率
+    """
+    student_model.train()
+    for teacher in teacher_models:
+        teacher.eval()
+    
+    running_loss = 0.0
+    running_kd_loss = 0.0
+    running_ce_loss = 0.0
+    correct = 0
+    total = 0
+    
+    criterion_ce = nn.CrossEntropyLoss()
+    criterion_kd = nn.KLDivLoss(reduction='batchmean')
+    
+    for inputs, targets in tqdm(trainloader, desc="Multi-Teacher KD Training", leave=False):
+        inputs, targets = inputs.to(device), targets.to(device)
+        
+        optimizer.zero_grad()
+        
+        # 学生模型的输出
+        student_outputs = student_model(inputs)
+        
+        # 获取所有教师模型的输出并平均
+        with torch.no_grad():
+            teacher_outputs_list = []
+            for teacher in teacher_models:
+                teacher_outputs_list.append(teacher(inputs))
+            # 计算平均logits
+            avg_teacher_outputs = torch.stack(teacher_outputs_list).mean(dim=0)
+        
+        # 硬标签损失（标准交叉熵）
+        ce_loss = criterion_ce(student_outputs, targets)
+        
+        # 蒸馏损失（KL散度）- 使用平均teacher logits
+        soft_student = F.log_softmax(student_outputs / temperature, dim=1)
+        soft_teacher = F.softmax(avg_teacher_outputs / temperature, dim=1)
+        kd_loss = criterion_kd(soft_student, soft_teacher) * (temperature ** 2)
+        
+        # 总损失
+        loss = alpha * kd_loss + (1 - alpha) * ce_loss
+        
+        loss.backward()
+        optimizer.step()
+        
+        running_loss += loss.item()
+        running_kd_loss += kd_loss.item()
+        running_ce_loss += ce_loss.item()
+        
+        _, predicted = student_outputs.max(1)
+        total += targets.size(0)
+        correct += predicted.eq(targets).sum().item()
+    
+    avg_loss = running_loss / len(trainloader)
+    avg_kd_loss = running_kd_loss / len(trainloader)
+    avg_ce_loss = running_ce_loss / len(trainloader)
+    accuracy = 100. * correct / total
+    
+    return avg_loss, avg_kd_loss, avg_ce_loss, accuracy
+
+
 def evaluate(model, testloader, criterion, device):
     """评估模型"""
     model.eval()
